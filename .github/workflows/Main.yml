@@ -21,9 +21,10 @@ jobs:
           curl -s https://ipinfo.io/json
           echo -e "\n========================================================"
 
-      # MICROSOFT EDGE ENGINE WITH CHROMEBOOK USER AGENT:
-      # Combines the 6GB RAM optimization with the original Chromebook identity string.
-      - name: Start Isolated Edge Docker Browser
+      # CHROMIUM ENGINE CONFIGURATION:
+      # Restored to the working Chromium base image on port 3000, 
+      # combined with the Chromebook user-agent profile identity.
+      - name: Start Isolated Chromium Docker Browser
         run: |
           docker run -d \
             --name=virtual-browser \
@@ -33,7 +34,7 @@ jobs:
             -e PGID=1000 \
             -e TZ=Asia/Kolkata \
             -p 3000:3000 \
-            lscr.io/linuxserver/msedge:latest \
+            lscr.io/linuxserver/chromium:latest \
             --user-agent="Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
       # EXPOSES TUNNEL & HOLDS RUNNER SECURELY FOR 6 HOURS USING LOCALHOST.RUN (LHR.LIFE)
@@ -62,7 +63,7 @@ jobs:
           fi
           
           echo "========================================================"
-          echo "🎉 DOCKER VIRTUAL EDGE BROWSER RUNNING SUCCESSFULLY!"
+          echo "🎉 DOCKER VIRTUAL CHROMIUM BROWSER RUNNING SUCCESSFULLY!"
           echo "👉 LIVE BROWSER URL: $LIVE_URL"
           echo "========================================================"
           echo "⏳ SYSTEM LOCK ACTIVE: Holding execution environment live..."
