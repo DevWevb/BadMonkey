@@ -12,81 +12,43 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # FIXED: Added sudo to the installation pipeline and built a combined VLESS/VMess parser
-      - name: Install and Initialize Free VLESS/VMess Client
+      # IP CHECK: Prints the standard datacenter tracking parameters for your reference
+      - name: Inspect Runner Public IP & ISP Info
         run: |
-          echo "📥 Installing network routing core with root privileges..."
-          curl -L -o install-release.sh https://github.com/XTLS/Xray-install/raw/main/install-release.sh
-          sudo bash install-release.sh
-          
-          echo "🌐 Fetching dynamic proxy pools..."
-          # Fetch both formats into memory
-          VLESS_POOL=$(curl -s https://raw.githubusercontent.com/ebrasha/free-v2ray-public-list/main/vless_configs.txt)
-          VMESS_POOL=$(curl -s https://raw.githubusercontent.com/ebrasha/free-v2ray-public-list/main/vmess_configs.txt)
-          
-          # Try to grab the first working configuration link
-          PROXY_LINK=""
-          if echo "$VLESS_POOL" | grep -q "vless://"; then
-            PROXY_LINK=$(echo "$VLESS_POOL" | grep -m 1 "vless://")
-            echo "✅ Successfully picked up a free VLESS node!"
-          elif echo "$VMESS_POOL" | grep -q "vmess://"; then
-            PROXY_LINK=$(echo "$VMESS_POOL" | grep -m 1 "vmess://")
-            echo "✅ Successfully picked up a free VMess node!"
-          else
-            # Backup link if the primary pools are down
-            PROXY_LINK=$(curl -s https://raw.githubusercontent.com/NiREvil/vless/main/sub/v2rayng-wg.txt | grep -m 1 "vless://")
-            echo "🔄 Using backup routing link..."
-          fi
-          
-          # Convert the assigned link into an internal local SOCKS5 proxy on port 10808
-          echo "🔧 Mapping configuration layers..."
-          sudo mkdir -p /usr/local/etc/xray
-          cat << 'EOF' | sudo tee /usr/local/etc/xray/config.json > /dev/null
-          {
-            "inbounds": [{
-              "port": 10808,
-              "protocol": "socks",
-              "settings": { "auth": "noauth", "udp": true }
-            }],
-            "outbounds": [{
-              "protocol": "freedom",
-              "settings": {}
-            }]
-          }
-          EOF
-          
-          # Start routing engine service in the background safely
-          echo "🚀 Igniting core system routing loops..."
-          sudo systemctl stop xray || true
-          sudo nohup xray run -c /usr/local/etc/xray/config.json > /dev/null 2>&1 &
-          sleep 3
+          echo "========================================================"
+          echo "🔍 TRACKING OUTBOUND TRAFFIC ENVIRONMENT IP..."
+          echo "========================================================"
+          curl -s https://ipinfo.io/json
+          echo -e "\n========================================================"
 
-      # MICROSOFT EDGE ENGINE: Run isolated, binding all outbound traffic 
-      # through our automated VLESS/VMess local loop.
+      # RESIDENTIAL CHROMEBOOK ENGINE CONFIGURATION:
+      # Passes the official ChromeOS/Chromebook User-Agent string to modify the identity.
       - name: Start Isolated Edge Docker Browser
         run: |
           docker run -d \
             --name=virtual-browser \
             --ipc=host \
-            --network=host \
             --shm-size="6gb" \
             -e PUID=1000 \
             -e PGID=1000 \
             -e TZ=Asia/Kolkata \
+            -p 3000:3000 \
             lscr.io/linuxserver/msedge:latest \
-            --proxy-server="socks5://127.0.0.1:10808"
+            --user-agent="Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-      # EXPOSES TUNNEL & KEEPS RUNNER ALIVE
-      - name: Create Web Connection & Stream Live Logs
+      # EXPOSES TUNNEL & HOLDS RUNNER SECURELY FOR 6 HOURS
+      - name: Create Web Connection
         run: |
           echo "========================================================"
-          echo "🚀 SPARKING ENGINE & INITIALIZING PROXY WEBSTREAM..."
+          echo "🚀 SPARKING ENGINE & INITIALIZING WEBSTREAM..."
           echo "========================================================"
           
           touch stream_tunnel.log
+          
+          # Establish background tunnel connection parameters
           ssh -o StrictHostKeyChecking=no -R 80:localhost:3000 nokey@localhost.run > stream_tunnel.log 2>&1 &
           
-          # Exact 10 seconds delay as requested to fast-track handshake hookups
+          # Exactly 10 seconds to handshake before pulling the url link
           echo "⏳ Waiting 10 seconds for streaming connection to secure..."
           sleep 10
           
@@ -99,11 +61,12 @@ jobs:
           fi
           
           echo "========================================================"
-          echo "🎉 SUCCESS: YOUR VIRTUAL BROWSER IS RUNNING LIVE!"
+          echo "🎉 DOCKER VIRTUAL EDGE BROWSER RUNNING SUCCESSFULLY!"
           echo "👉 LIVE BROWSER URL: $LIVE_URL"
           echo "========================================================"
-          echo "⚠️ TO CLOSE SESSION: Click 'Cancel workflow' on GitHub."
+          echo "⏳ SYSTEM LOCK ACTIVE: Holding execution environment live..."
           echo "========================================================"
           
-          docker logs -f virtual-browser
+          # Forced 6-hour pause block so the runner stays completely alive without showing logs
+          sleep 21600
           
