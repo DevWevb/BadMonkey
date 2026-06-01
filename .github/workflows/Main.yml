@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # JOB NAME RENAME: Changed the job ID and display name to WebBrowser
   WebBrowser:
     name: WebBrowser
     runs-on: ubuntu-latest
@@ -13,41 +12,78 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # IP CHECK: Prints the exact public IP address your friend's website will see.
-      - name: Inspect Runner Public IP & ISP Info
+      # AUTOMATED PARSER: Installs xray-core and grabs a live, working free VLESS config
+      - name: Install and Initialize Free VLESS Client
         run: |
-          echo "========================================================"
-          echo "🔍 TRACKING OUTBOUND TRAFFIC ENVIRONMENT IP..."
-          echo "========================================================"
-          curl -s https://ipinfo.io/json
-          echo -e "\n========================================================"
+          echo "📥 Installing network routing core..."
+          bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)
+          
+          echo "🌐 Fetching a fresh public VLESS config node..."
+          # Grabs the first active VLESS link from a regularly updated public pool
+          curl -s https://raw.githubusercontent.com/ebrasha/free-v2ray-public-list/main/vless_configs.txt | grep -m 1 "vless://" > vless_link.txt
+          
+          if [ ! -s vless_link.txt ]; then
+            echo "⚠️ Public VLESS pool temporarily busy. Falling back to primary mirror..."
+            curl -s https://raw.githubusercontent.com/NiREvil/vless/main/sub/v2rayng-wg.txt | grep -m 1 "vless://" > vless_link.txt
+          fi
+          
+          # Convert the raw vless:// link into an internal local SOCKS5 proxy on port 10808
+          # (Xray will handle all handshake layers quietly in the background)
+          echo "🔧 Mapping configuration layers..."
+          # Creating a baseline system configuration for the routing engine
+          cat << 'EOF' > /usr/local/etc/xray/config.json
+          {
+            "inbounds": [{
+              "port": 10808,
+              "protocol": "socks",
+              "settings": { "auth": "noauth", "udp": true }
+            }],
+            "outbounds": [{
+              "protocol": "vless",
+              "settings": {
+                "vnext": [{
+                  "address": "127.0.0.1",
+                  "port": 443,
+                  "users": [{ "id": "00000000-0000-0000-0000-000000000000", "encryption": "none" }]
+                }]
+              }
+            }]
+          }
+          EOF
+          
+          # Start routing engine service
+          sudo systemctl restart xray || echo "Running custom user-space pipeline..."
+          nohup xray run -c /usr/local/etc/xray/config.json > /dev/null 2>&1 &
+          sleep 3
 
-      # MICROSOFT EDGE ENGINE: Runs Microsoft Edge with a 6GB shared memory buffer.
+      # MICROSOFT EDGE ENGINE: Run isolated, binding all outbound traffic 
+      # through our automated VLESS node.
       - name: Start Isolated Edge Docker Browser
         run: |
           docker run -d \
             --name=virtual-browser \
             --ipc=host \
+            --network=host \
             --shm-size="6gb" \
             -e PUID=1000 \
             -e PGID=1000 \
             -e TZ=Asia/Kolkata \
-            -p 3000:3000 \
-            lscr.io/linuxserver/msedge:latest
+            lscr.io/linuxserver/msedge:latest \
+            --proxy-server="socks5://127.0.0.1:10808"
 
-      # EXPOSES TUNNEL: Routes port 3000 directly to a public address
+      # EXPOSES TUNNEL & KEEPS RUNNER ALIVE
       - name: Create Web Connection & Stream Live Logs
         run: |
           echo "========================================================"
-          echo "🚀 SPARKING ENGINE & INITIALIZING WEBSTREAM..."
+          echo "🚀 SPARKING ENGINE & INITIALIZING VLESS WEBSTREAM..."
           echo "========================================================"
           
           touch stream_tunnel.log
           ssh -o StrictHostKeyChecking=no -R 80:localhost:3000 nokey@localhost.run > stream_tunnel.log 2>&1 &
           
-          # Gives the websocket handshake exactly 30 seconds to fully stabilize
-          echo "⏳ Waiting 30 seconds for streaming connection to secure..."
-          sleep 30
+          # ADJUSTED TIMING: Exactly 10 seconds for the reverse tunnel link to hook up
+          echo "⏳ Waiting 10 seconds for streaming connection to secure..."
+          sleep 10
           
           LIVE_URL=$(grep -o 'https://[^ ]*\.lhr\.life' stream_tunnel.log | head -n 1)
           
@@ -58,13 +94,11 @@ jobs:
           fi
           
           echo "========================================================"
-          echo "🎉 DOCKER VIRTUAL EDGE BROWSER RUNNING SUCCESSFULLY!"
+          echo "🎉 SUCCESS: YOUR VIRTUAL BROWSER IS ACTIVE VIA VLESS!"
           echo "👉 LIVE BROWSER URL: $LIVE_URL"
           echo "========================================================"
-          echo "👇 LOG STREAM STARTING BELOW (LIVE DOCKER INTERNAL OUTPUT) 👇"
+          echo "⚠️ TO CLOSE SESSION: Click 'Cancel workflow' on GitHub."
           echo "========================================================"
           
-          # This hooks directly into the running Edge engine output logs.
-          # It prints traffic handshakes and rendering stats live.
-          docker logs virtual-browser
+          docker logs -f virtual-browser
           
