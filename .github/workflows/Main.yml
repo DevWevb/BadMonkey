@@ -1,19 +1,29 @@
-name: Host Docker Virtual Browser Online
+name: WebBrowser
 
 on:
-  workflow_dispatch: # Run manually with one click from the Actions tab
+  workflow_dispatch:
 
 jobs:
-  launch-virtual-browser:
+  # JOB NAME RENAME: Changed the job ID and display name to WebBrowser
+  WebBrowser:
+    name: WebBrowser
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # MAXED PERFORMANCE: Allocated 6gb of shared memory. 
-      # This utilizes the absolute limit of the GitHub runner's RAM for perfect streaming.
-      - name: Start Isolated Docker Browser
+      # IP CHECK: Prints the exact public IP address your friend's website will see.
+      - name: Inspect Runner Public IP & ISP Info
+        run: |
+          echo "========================================================"
+          echo "🔍 TRACKING OUTBOUND TRAFFIC ENVIRONMENT IP..."
+          echo "========================================================"
+          curl -s https://ipinfo.io/json
+          echo -e "\n========================================================"
+
+      # MICROSOFT EDGE ENGINE: Runs Microsoft Edge with a 6GB shared memory buffer.
+      - name: Start Isolated Edge Docker Browser
         run: |
           docker run -d \
             --name=virtual-browser \
@@ -22,29 +32,23 @@ jobs:
             -e PUID=1000 \
             -e PGID=1000 \
             -e TZ=Asia/Kolkata \
-            -e CHROME_CLI=https://www.google.com \
             -p 3000:3000 \
-            lscr.io/linuxserver/chromium:latest
+            lscr.io/linuxserver/msedge:latest
 
-      # EXPOSES TUNNEL: Uses an open-source, zero-setup tunnel engine to route 
-      # port 3000 directly to a public address without signup barriers.
-      - name: Create Web Connection & Expose Stream
+      # EXPOSES TUNNEL: Routes port 3000 directly to a public address
+      - name: Create Web Connection & Stream Live Logs
         run: |
           echo "========================================================"
           echo "🚀 SPARKING ENGINE & INITIALIZING WEBSTREAM..."
           echo "========================================================"
           
-          # Initialize background logging
           touch stream_tunnel.log
-          
-          # Open direct SSH reverse-forward tunnel via localhost.run
           ssh -o StrictHostKeyChecking=no -R 80:localhost:3000 nokey@localhost.run > stream_tunnel.log 2>&1 &
           
           # Gives the websocket handshake exactly 30 seconds to fully stabilize
           echo "⏳ Waiting 30 seconds for streaming connection to secure..."
           sleep 30
           
-          # Extract live endpoint from stream logs
           LIVE_URL=$(grep -o 'https://[^ ]*\.lhr\.life' stream_tunnel.log | head -n 1)
           
           if [ -z "$LIVE_URL" ]; then
@@ -54,12 +58,13 @@ jobs:
           fi
           
           echo "========================================================"
-          echo "🎉 DOCKER VIRTUAL BROWSER ENGINE RUNNING SUCCESSFULLY!"
-          echo "👉 LIVE URL: $LIVE_URL"
+          echo "🎉 DOCKER VIRTUAL EDGE BROWSER RUNNING SUCCESSFULLY!"
+          echo "👉 LIVE BROWSER URL: $LIVE_URL"
           echo "========================================================"
-          echo "Keep this GitHub browser tab open to stay connected."
-          echo "Session automatically clean-wipes after 6 hours."
+          echo "👇 LOG STREAM STARTING BELOW (LIVE DOCKER INTERNAL OUTPUT) 👇"
+          echo "========================================================"
           
-          # Keeps container instance alive for active web browsing session
-          sleep 21600
+          # This hooks directly into the running Edge engine output logs.
+          # It prints traffic handshakes and rendering stats live.
+          docker logs virtual-browser
           
