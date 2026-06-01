@@ -21,8 +21,9 @@ jobs:
           curl -s https://ipinfo.io/json
           echo -e "\n========================================================"
 
-      # RESIDENTIAL CHROMEBOOK ENGINE CONFIGURATION:
-      # Passes the official ChromeOS/Chromebook User-Agent string to modify the identity.
+      # MICROSOFT EDGE CHROMEBOOK ENGINE CONFIGURATION:
+      # Passes a specialized User-Agent forcing the engine to announce itself 
+      # specifically as Microsoft Edge running on top of a ChromeOS desktop device.
       - name: Start Isolated Edge Docker Browser
         run: |
           docker run -d \
@@ -34,25 +35,26 @@ jobs:
             -e TZ=Asia/Kolkata \
             -p 3000:3000 \
             lscr.io/linuxserver/msedge:latest \
-            --user-agent="Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            --user-agent="Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
 
-      # EXPOSES TUNNEL & HOLDS RUNNER SECURELY FOR 6 HOURS
+      # EXPOSES TUNNEL & HOLDS RUNNER SECURELY FOR 6 HOURS USING PINGGY
       - name: Create Web Connection
         run: |
           echo "========================================================"
-          echo "🚀 SPARKING ENGINE & INITIALIZING WEBSTREAM..."
+          echo "🚀 SPARKING ENGINE & INITIALIZING WEBSTREAM VIA PINGGY..."
           echo "========================================================"
           
           touch stream_tunnel.log
           
-          # Establish background tunnel connection parameters
-          ssh -o StrictHostKeyChecking=no -R 80:localhost:3000 nokey@localhost.run > stream_tunnel.log 2>&1 &
+          # Establish background tunnel connection parameters via Pinggy
+          ssh -o StrictHostKeyChecking=no -p 443 -R 0:localhost:3000 free@the.pinggy.io > stream_tunnel.log 2>&1 &
           
           # Exactly 10 seconds to handshake before pulling the url link
           echo "⏳ Waiting 10 seconds for streaming connection to secure..."
           sleep 10
           
-          LIVE_URL=$(grep -o 'https://[^ ]*\.lhr\.life' stream_tunnel.log | head -n 1)
+          # Extracts the newly generated pinggy.link URL from the logs
+          LIVE_URL=$(grep -o 'https://[^ ]*\.pinggy\.link' stream_tunnel.log | head -n 1)
           
           if [ -z "$LIVE_URL" ]; then
             echo "❌ Link creation paused. Connection log output:"
@@ -69,4 +71,4 @@ jobs:
           
           # Forced 6-hour pause block so the runner stays completely alive without showing logs
           sleep 21600
-          
+          free@the.pinggy.io
