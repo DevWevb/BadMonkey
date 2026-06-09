@@ -1,0 +1,85 @@
+name: WebBrowser Mobile 
+
+on:
+  workflow_dispatch:
+
+jobs:
+  WebBrowser:
+    name: WebBrowser
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # IP CHECK: Prints the standard datacenter tracking parameters for your reference
+      - name: Inspect Runner Public IP & ISP Info
+        run: |
+          echo "========================================================"
+          echo "🔍 TRACKING OUTBOUND TRAFFIC ENVIRONMENT IP..."
+          echo "========================================================"
+          curl -s https://ipinfo.io/json
+          echo -e "\n========================================================"
+
+      # MOBILE CHROMIUM ENGINE CONFIGURATION:
+      # We override the width and height to match a standard mobile device ratio.
+      # Setting it to a responsive mobile viewport size forces the container 
+      # and the web engine to match your phone perfectly.
+      - name: Start Isolated Chromium Docker Browser
+        run: |
+          docker run -d \
+            --name=virtual-browser \
+            --ipc=host \
+            --shm-size="6gb" \
+            -e PUID=1000 \
+            -e PGID=1000 \
+            -e TZ=Asia/Kolkata \
+            -e CUSTOM_RES_W=412 \
+            -e CUSTOM_RES_H=915 \
+            -e DISPLAY_WIDTH=412 \
+            -e DISPLAY_HEIGHT=915 \
+            -e CHROMIUM_FLAGS="--user-agent='Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' --start-maximized" \
+            -p 3000:3000 \
+            lscr.io/linuxserver/chromium:latest
+
+      # CLOUDFLARE ENGINE: Installs and flashes a live free quick tunnel
+      - name: Install and Initialize Cloudflare Tunnel
+        run: |
+          echo "📥 Setting up secure Cloudflare networking components..."
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          
+          touch cloudflare_tunnel.log
+          # Start a free, zero-config quick tunnel pointing directly to the browser port
+          cloudflared tunnel --url http://localhost:3000 > cloudflare_tunnel.log 2>&1 &
+
+      # CAPTURES URL LINK & STABILIZATION DELAY
+      - name: Create Web Connection
+        run: |
+          echo "========================================================"
+          echo "🚀 SPARKING ENGINE & INITIALIZING WEBSTREAM VIA CLOUDFLARE..."
+          echo "========================================================"
+          
+          # Exactly 10 seconds to let Cloudflare generate your clean live web link
+          echo "⏳ Waiting 10 seconds for streaming connection to secure..."
+          sleep 10
+          
+          # Extracts your custom, stable trycloudflare link
+          LIVE_URL=$(grep -o 'https://[^ ]*\.trycloudflare\.com' cloudflare_tunnel.log | head -n 1)
+          
+          if [ -z "$LIVE_URL" ]; then
+            echo "❌ Cloudflare pipeline paused. Connection log output:"
+            cat cloudflare_tunnel.log
+            exit 1
+          fi
+          
+          echo "========================================================"
+          echo "🎉 DOCKER VIRTUAL CHROMIUM BROWSER RUNNING SUCCESSFULLY!"
+          echo "👉 LIVE BROWSER URL: $LIVE_URL"
+          echo "========================================================"
+          echo "⏳ SYSTEM LOCK ACTIVE: Holding execution environment live..."
+          echo "========================================================"
+          
+          # Forced 6-hour pause block so the runner stays completely alive without showing logs
+          sleep 21600
+
